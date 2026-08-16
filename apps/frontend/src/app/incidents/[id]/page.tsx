@@ -8,6 +8,8 @@ import {
   ArrowRight, ShieldCheck, HelpCircle
 } from "lucide-react";
 
+import { API_BASE_URL } from "@/config/api";
+
 export default function IncidentWarRoom({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = React.use(params);
   const incidentId = resolvedParams.id;
@@ -23,7 +25,7 @@ export default function IncidentWarRoom({ params }: { params: Promise<{ id: stri
     fetchIncidentDetails();
 
     // 2. Open Server-Sent Events (SSE) stream for live updates
-    const eventSource = new EventSource(`http://127.0.0.1:8000/api/demo/incident/${incidentId}/stream`);
+    const eventSource = new EventSource(`${API_BASE_URL}/api/demo/incident/${incidentId}/stream`);
 
     eventSource.onopen = () => {
       console.log("SSE: Connected to incident stream");
@@ -66,7 +68,7 @@ export default function IncidentWarRoom({ params }: { params: Promise<{ id: stri
 
   const fetchIncidentDetails = async () => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/demo/incident/${incidentId}`);
+      const res = await fetch(`${API_BASE_URL}/api/demo/incident/${incidentId}`);
       if (!res.ok) throw new Error("Incident not found");
       const data = await res.json();
       setIncidentData(data);

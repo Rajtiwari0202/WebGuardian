@@ -11,6 +11,8 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar
 } from "recharts";
 
+import { API_BASE_URL } from "@/config/api";
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"observatory" | "visualizer" | "chat" | "versions">("observatory");
   const [mounted, setMounted] = useState(false);
@@ -51,7 +53,7 @@ export default function Dashboard() {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/demo/incident/${activeIncidentId}`);
+        const res = await fetch(`${API_BASE_URL}/api/demo/incident/${activeIncidentId}`);
         const data = await res.json();
         setIncidentTrace(data);
 
@@ -70,18 +72,18 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const scrapersRes = await fetch("http://127.0.0.1:8000/api/scrapers");
+      const scrapersRes = await fetch(`${API_BASE_URL}/api/scrapers`);
       const scrapersData = await scrapersRes.json();
       setScrapers(scrapersData);
       
       const laptopScraper = scrapersData.find((s: any) => s.name.includes("Laptop")) || scrapersData[0];
       if (laptopScraper) {
-        const detailsRes = await fetch(`http://127.0.0.1:8000/api/scrapers/${laptopScraper.id}`);
+        const detailsRes = await fetch(`${API_BASE_URL}/api/scrapers/${laptopScraper.id}`);
         const detailsData = await detailsRes.json();
         setSelectedScraper(detailsData);
       }
 
-      const analyticsRes = await fetch("http://127.0.0.1:8000/api/analytics/dashboard");
+      const analyticsRes = await fetch(`${API_BASE_URL}/api/analytics/dashboard`);
       const analyticsData = await analyticsRes.json();
       setAnalytics(analyticsData);
     } catch (err) {
@@ -93,7 +95,7 @@ export default function Dashboard() {
     if (!selectedScraper) return;
     setIsRunning(true);
     try {
-      await fetch(`http://127.0.0.1:8000/api/scrapers/${selectedScraper.id}/run`, {
+      await fetch(`${API_BASE_URL}/api/scrapers/${selectedScraper.id}/run`, {
         method: "POST"
       });
       setTimeout(() => {
@@ -120,7 +122,7 @@ export default function Dashboard() {
     });
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/demo/trigger-chaos?scraper_id=${selectedScraper.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/demo/trigger-chaos?scraper_id=${selectedScraper.id}`, {
         method: "POST"
       });
       const data = await res.json();
@@ -144,7 +146,7 @@ export default function Dashboard() {
     });
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/demo/trigger-timeout-drift?scraper_id=${selectedScraper.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/demo/trigger-timeout-drift?scraper_id=${selectedScraper.id}`, {
         method: "POST"
       });
       const data = await res.json();
@@ -168,7 +170,7 @@ export default function Dashboard() {
     });
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/demo/trigger-unsafe-drift?scraper_id=${selectedScraper.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/demo/trigger-unsafe-drift?scraper_id=${selectedScraper.id}`, {
         method: "POST"
       });
       const data = await res.json();
@@ -180,7 +182,7 @@ export default function Dashboard() {
 
   const handleResetDemo = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/demo/reset", {
+      const res = await fetch(`${API_BASE_URL}/api/demo/reset`, {
         method: "POST"
       });
       const data = await res.json();
@@ -199,7 +201,7 @@ export default function Dashboard() {
   const handleRollback = async (version: number) => {
     if (!selectedScraper) return;
     try {
-      await fetch(`http://127.0.0.1:8000/api/scrapers/${selectedScraper.id}/rollback?version_number=${version}`, {
+      await fetch(`${API_BASE_URL}/api/scrapers/${selectedScraper.id}/rollback?version_number=${version}`, {
         method: "POST"
       });
       fetchData();
@@ -218,7 +220,7 @@ export default function Dashboard() {
     setChatLoading(true);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/chat", {
+      const res = await fetch(`${API_BASE_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMsg })
