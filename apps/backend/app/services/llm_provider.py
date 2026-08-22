@@ -116,13 +116,67 @@ class MockProvider(LLMProvider):
             "candidates": []
         }
 
+class GeminiProvider(LLMProvider):
+    def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash"):
+        self.api_key = api_key
+        if not model_name or "gemini" not in model_name.lower():
+            self.model_name = "gemini-1.5-flash"
+        else:
+            self.model_name = model_name
+        logger.info(f"Initialized Live Gemini Provider using model '{self.model_name}'")
+
+    def generate(self, prompt: str, system_prompt: str = "") -> str:
+        import httpx
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.api_key}"
+        full_text = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+        payload = {
+            "contents": [{"parts": [{"text": full_text}]}]
+        }
+        try:
+            with httpx.Client(timeout=20.0) as client:
+                res = client.post(url, json=payload)
+                data = res.json()
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            logger.error(f"Gemini generate error: {e}")
+            return ""
+
+    def extract_json(self, prompt: str, system_prompt: str = "") -> Dict[str, Any]:
+        import httpx
+        import re
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.api_key}"
+        sys_instruction = (system_prompt or "") + "\nOutput MUST be valid raw JSON format only. No markdown formatting."
+        payload = {
+            "contents": [{"parts": [{"text": f"{sys_instruction}\n\n{prompt}"}]}],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+        try:
+            with httpx.Client(timeout=20.0) as client:
+                res = client.post(url, json=payload)
+                data = res.json()
+                raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                cleaned = re.sub(r"^```json\s*|^```\s*|```$", "", raw_text.strip(), flags=re.MULTILINE)
+                return json.loads(cleaned)
+        except Exception as e:
+            logger.error(f"Gemini extract_json error: {e}")
+            return {}
+
+
 def get_llm_provider() -> LLMProvider:
     provider_type = settings.LLM_PROVIDER.lower()
-    if provider_type == "openai" and settings.OPENAI_API_KEY:
-        return OpenAIProvider(model_name=settings.LLM_MODEL, api_key=settings.OPENAI_API_KEY)
-    elif provider_type == "mock":
-        return MockProvider()
-    else:
-        # Fallback to mock and log warning
-        logger.warning(f"LLM_PROVIDER '{provider_type}' not available or missing API keys. Falling back to MockProvider.")
-        return MockProvider()
+    
+    # 1. Gemini
+    if settings.GEMINI_API_KEY or provider_type == "gemini":
+        if settings.GEMINI_API_KEY:
+            return GeminiProvider(
+                api_key=settings.GEMINI_API_KEY,
+                model_name=settings.LLM_MODEL if "gemini" in settings.LLM_MODEL.lower() else "gemini-1.5-flash"
+            )
+
+    # 2. OpenAI
+    if settings.OPENAI_API_KEY or provider_type == "openai":
+        if settings.OPENAI_API_KEY:
+            return OpenAIProvider(model_name=settings.LLM_MODEL, api_key=settings.OPENAI_API_KEY)
+
+    # 3. Default to zero-config MockProvider for demo simulation
+    return MockProvider()

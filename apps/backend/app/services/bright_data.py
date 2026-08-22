@@ -339,10 +339,10 @@ class MockBrightDataService(BrightDataService):
 
 
 def get_bright_data_service() -> BrightDataService:
-    if settings.BRIGHT_DATA_API_KEY and settings.BRIGHT_DATA_CUSTOMER_ID:
+    if settings.BRIGHT_DATA_API_KEY:
         return RealBrightDataService(
             api_key=settings.BRIGHT_DATA_API_KEY,
-            customer_id=settings.BRIGHT_DATA_CUSTOMER_ID
+            customer_id=settings.BRIGHT_DATA_CUSTOMER_ID or "hl_webguardian"
         )
     return MockBrightDataService()
 
