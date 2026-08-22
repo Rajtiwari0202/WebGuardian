@@ -6,6 +6,7 @@ from langgraph.graph import StateGraph, START, END
 from apps.backend.app.services.llm_provider import get_llm_provider
 from apps.backend.app.services.validation_sandbox import ValidationSandbox
 from apps.backend.app.services.bright_data import get_bright_data_service
+from apps.backend.app.services.fast_heuristic_engine import fast_heuristic_engine
 from apps.backend.app.models.models import (
     Scraper, ScraperVersion, FailureEvent, RepairAttempt, RepairCandidate, AuditLog, AgentMemory
 )
@@ -147,9 +148,22 @@ def repair_planning_node(state: AgentState) -> Dict[str, Any]:
     
     res = llm.extract_json(prompt, system_prompt="You are a CSS Selector Generator AI.")
     
-    candidates = res.get("candidates", [])
-    if not candidates and settings.LLM_PROVIDER.lower() == "mock":
-        candidates = [
+    # --- TIER 1: FAST-PATH HEURISTIC ENGINE (<100ms) ---
+    heuristic_cands = []
+    if state.get("current_html"):
+        try:
+            heuristic_cands = fast_heuristic_engine.solve(
+                html_content=state["current_html"],
+                failed_selector=state.get("original_selectors", {}).get("price", ".price"),
+                field_name="price",
+                expected_type="currency"
+            )
+        except Exception as err:
+            logger.debug(f"Fast heuristic solver skipped: {err}")
+
+    base_candidates = res.get("candidates", [])
+    if not base_candidates and settings.LLM_PROVIDER.lower() == "mock":
+        base_candidates = [
             {
                 "field_name": "price",
                 "selector": "[data-testid='price']",
@@ -170,9 +184,18 @@ def repair_planning_node(state: AgentState) -> Dict[str, Any]:
             }
         ]
     else:
-        for cand in candidates:
+        for cand in base_candidates:
             if "field_name" not in cand:
                 cand["field_name"] = "price"
+
+    # Merge heuristic candidates at the top (deduplicating by selector)
+    candidates = []
+    seen = set()
+    for c in heuristic_cands + base_candidates:
+        sel = c.get("selector")
+        if sel not in seen:
+            seen.add(sel)
+            candidates.append(c)
 
     # --- AGENT MEMORY LOOKUP & STRATEGY BOOST ---
     db = SessionLocal()
@@ -232,7 +255,7 @@ def candidate_validation_node(state: AgentState) -> Dict[str, Any]:
             field_name=field_name,
             candidate_selector=cand["selector"],
             strategy=cand["strategy"],
-            model_confidence=cand["model_confidence"],
+            model_confidence=cand.get("model_confidence", cand.get("confidence_score", 95.0)),
             contract=contract_def,
             old_selector=old_selector
         )

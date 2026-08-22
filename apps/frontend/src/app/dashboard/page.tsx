@@ -278,6 +278,10 @@ export default function Dashboard() {
               <Link href="/architecture" className="text-[10px] text-zinc-400 hover:text-white transition flex items-center gap-0.5">
                 View System Map <ArrowRight className="w-2.5 h-2.5" />
               </Link>
+              <span className="text-zinc-700 text-[10px]">•</span>
+              <Link href="/settings" className="text-[10px] text-indigo-400 hover:text-indigo-300 transition flex items-center gap-0.5 font-bold">
+                Settings & Integrations <ArrowRight className="w-2.5 h-2.5" />
+              </Link>
             </div>
           </div>
         </div>

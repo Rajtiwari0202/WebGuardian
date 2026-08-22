@@ -230,3 +230,97 @@ class AgentMemory(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     scraper = relationship("Scraper", back_populates="memories")
+
+
+class Tenant(Base):
+    __tablename__ = "tenants"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(255), nullable=False)
+    slug = Column(String(100), unique=True, index=True, nullable=False)
+    plan_tier = Column(String(50), default="growth")  # starter, growth, scale, enterprise
+    max_collectors = Column(Integer, default=25)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    members = relationship("TenantMembership", back_populates="tenant", cascade="all, delete-orphan")
+    slack_integrations = relationship("SlackIntegration", back_populates="tenant", cascade="all, delete-orphan")
+    webhooks = relationship("WebhookEndpoint", back_populates="tenant", cascade="all, delete-orphan")
+    api_keys = relationship("APIKey", back_populates="tenant", cascade="all, delete-orphan")
+    heuristic_rules = relationship("HeuristicRule", back_populates="tenant", cascade="all, delete-orphan")
+
+
+class TenantMembership(Base):
+    __tablename__ = "tenant_memberships"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role = Column(String(50), default="operator")  # owner, admin, operator, viewer
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    tenant = relationship("Tenant", back_populates="members")
+    user = relationship("User")
+
+
+class SlackIntegration(Base):
+    __tablename__ = "slack_integrations"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    team_name = Column(String(255), nullable=True)
+    channel_name = Column(String(255), nullable=False)
+    webhook_url = Column(Text, nullable=False)
+    is_active = Column(Integer, default=1)  # 1 = True, 0 = False
+    notify_on_failure = Column(Integer, default=1)
+    notify_on_recovery = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    tenant = relationship("Tenant", back_populates="slack_integrations")
+
+
+class WebhookEndpoint(Base):
+    __tablename__ = "webhook_endpoints"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    url = Column(Text, nullable=False)
+    secret = Column(String(255), nullable=True)
+    is_active = Column(Integer, default=1)
+    events = Column(JSON, default=list)  # ["failure.detected", "repair.completed", "collector.deployed"]
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    tenant = relationship("Tenant", back_populates="webhooks")
+
+
+class HeuristicRule(Base):
+    __tablename__ = "heuristic_rules"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True)
+    domain_pattern = Column(String(255), nullable=False)  # e.g., "*.shopify.com" or "laptops-r-us.com"
+    target_field = Column(String(100), nullable=False)
+    pattern_type = Column(String(50), default="attribute_shift")  # attribute_shift, class_alias, wrapper_collapse
+    source_pattern = Column(String(255), nullable=False)
+    target_pattern = Column(String(255), nullable=False)
+    confidence_score = Column(Float, default=95.0)
+    times_applied = Column(Integer, default=0)
+    last_used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    tenant = relationship("Tenant", back_populates="heuristic_rules")
+
+
+class APIKey(Base):
+    __tablename__ = "api_keys"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    key_hash = Column(String(255), unique=True, index=True, nullable=False)
+    key_prefix = Column(String(16), nullable=False)  # e.g., "wg_live_abc..."
+    is_active = Column(Integer, default=1)
+    last_used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    tenant = relationship("Tenant", back_populates="api_keys")
+

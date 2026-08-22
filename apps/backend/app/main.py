@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from apps.backend.app.core.config import settings
 from apps.backend.app.core.database import Base, engine
-from apps.backend.app.routers import scrapers, analytics, demo, chat
+from apps.backend.app.routers import scrapers, analytics, demo, chat, integrations
 from apps.backend.app.services.worker_manager import WorkerManager
 
 # Setup Logger
@@ -35,6 +35,7 @@ app.include_router(scrapers.router)
 app.include_router(analytics.router)
 app.include_router(demo.router)
 app.include_router(chat.router)
+app.include_router(integrations.router)
 
 @app.on_event("startup")
 async def startup_event():
