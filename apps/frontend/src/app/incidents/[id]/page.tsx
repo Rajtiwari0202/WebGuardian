@@ -21,10 +21,15 @@ export default function IncidentWarRoom({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Fetch current incident data
+    // 1. Initial fetch
     fetchIncidentDetails();
 
-    // 2. Open Server-Sent Events (SSE) stream for live updates
+    // 2. Continuous polling until resolved
+    const pollTimer = setInterval(() => {
+      fetchIncidentDetails();
+    }, 1200);
+
+    // 3. Open Server-Sent Events (SSE) stream for live updates
     const eventSource = new EventSource(`${API_BASE_URL}/api/demo/incident/${incidentId}/stream`);
 
     eventSource.onopen = () => {
@@ -36,8 +41,7 @@ export default function IncidentWarRoom({ params }: { params: Promise<{ id: stri
         const data = JSON.parse(event.data);
         if (data.type === "AGENT_STEP") {
           setLiveLog(prev => {
-            // Avoid duplicate log steps
-            if (prev.some(item => item.message === data.message)) return prev;
+            if (prev.some(item => item.description === data.message)) return prev;
             return [...prev, {
               time: new Date().toLocaleTimeString(),
               event: data.node.replace("_", " "),
@@ -46,9 +50,9 @@ export default function IncidentWarRoom({ params }: { params: Promise<{ id: stri
             }];
           });
           
-          if (data.node === "RECOVERY_RUN") {
+          if (data.node === "RECOVERY_RUN" || data.node === "DEPLOYMENT" || data.node === "VERSION_AND_AUDIT") {
             setStatus("RECOVERED");
-            setTimeout(fetchIncidentDetails, 1000);
+            setTimeout(fetchIncidentDetails, 500);
           }
         }
       } catch (err) {
@@ -57,11 +61,11 @@ export default function IncidentWarRoom({ params }: { params: Promise<{ id: stri
     };
 
     eventSource.onerror = (err) => {
-      console.log("SSE: Closed or offline");
       eventSource.close();
     };
 
     return () => {
+      clearInterval(pollTimer);
       eventSource.close();
     };
   }, [incidentId]);
@@ -72,7 +76,7 @@ export default function IncidentWarRoom({ params }: { params: Promise<{ id: stri
       if (!res.ok) throw new Error("Incident not found");
       const data = await res.json();
       setIncidentData(data);
-      if (data.status === "SUCCESS") {
+      if (data.status === "SUCCESS" || (data.new_selector && data.new_selector !== "TBD (Generating...)")) {
         setStatus("RECOVERED");
       }
     } catch (err: any) {
